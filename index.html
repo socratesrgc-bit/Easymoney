@@ -44,6 +44,14 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         
+        .sync-section {
+            background: #e8f4fc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
         .user-info {
             font-size: 1.2rem;
             margin-top: 10px;
@@ -206,6 +214,21 @@
         .btn-delete:hover {
             background-color: #c0392b;
         }
+
+        .sync-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .sync-btn:hover {
+            background: #2980b9;
+        }
         
         .history {
             display: grid;
@@ -341,6 +364,17 @@
             <p class="user-info">Soles (PER)</p>
         </header>
         
+        <!-- Sección de sincronización -->
+        <div class="sync-section">
+            <h3>🔄 Sincronización entre dispositivos</h3>
+            <button class="sync-btn" onclick="exportData()">📥 Exportar Datos</button>
+            <button class="sync-btn" onclick="importData()">📤 Importar Datos</button>
+            <button class="sync-btn" onclick="saveToFile()">💾 Guardar Archivo</button>
+            <p style="margin-top: 10px; font-size: 0.9rem;">
+                Usa estos botones para transferir tus datos entre trabajo y casa
+            </p>
+        </div>
+        
         <div class="dashboard">
             <div class="card total-income">
                 <h2>TOTAL INGRESOS</h2>
@@ -458,11 +492,53 @@
     </div>
 
     <script>
-        // Cargar datos desde localStorage o usar datos de ejemplo
-        let transactions = JSON.parse(localStorage.getItem('financialTransactions')) || [
-            { id: 1, type: 'income', description: 'Salario', amount: 2500.00, date: '2023-10-15' },
-            { id: 2, type: 'expense', description: 'Alquiler', amount: 800.00, date: '2023-10-05' }
-        ];
+        // Cargar datos desde localStorage o usar datos vacíos
+        let transactions = JSON.parse(localStorage.getItem('financialTransactions')) || [];
+
+        // FUNCIÓN CORREGIDA PARA OBTENER FECHA ACTUAL
+        function getCurrentDate() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // FUNCIÓN MEJORADA PARA FORMATEAR FECHA
+        function formatDate(dateString) {
+            try {
+                // Si la fecha es inválida, mostrar fecha actual
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) {
+                    return new Date().toLocaleDateString('es-PE');
+                }
+                
+                const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+                return date.toLocaleDateString('es-PE', options);
+            } catch (error) {
+                // Si hay error, devolver fecha actual
+                return new Date().toLocaleDateString('es-PE');
+            }
+        }
+
+        // FUNCIÓN PARA CORREGIR FECHAS EXISTENTES (se ejecuta al cargar)
+        function fixExistingDates() {
+            let needsFix = false;
+            const currentDate = getCurrentDate();
+            
+            transactions.forEach(transaction => {
+                // Si la fecha es del futuro (2025) o inválida, corregirla
+                if (transaction.date && transaction.date.startsWith('2025')) {
+                    transaction.date = currentDate;
+                    needsFix = true;
+                }
+            });
+            
+            if (needsFix) {
+                saveToLocalStorage();
+                console.log('Fechas corregidas automáticamente');
+            }
+        }
 
         // Guardar datos en localStorage
         function saveToLocalStorage() {
@@ -486,6 +562,7 @@
 
         // Inicializar la aplicación
         function init() {
+            fixExistingDates(); // Corregir fechas al cargar
             updateDashboard();
             renderTransactionHistory();
             setupEventListeners();
@@ -525,12 +602,6 @@
             totalIncomeElement.textContent = `S/ ${totalIncome.toFixed(2)}`;
             totalExpensesElement.textContent = `S/ ${totalExpenses.toFixed(2)}`;
             netBalanceElement.textContent = `S/ ${netBalance.toFixed(2)}`;
-        }
-
-        // Formatear fecha para mostrar
-        function formatDate(dateString) {
-            const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
-            return new Date(dateString).toLocaleDateString('es-PE', options);
         }
 
         // Renderizar el historial de transacciones
@@ -604,7 +675,7 @@
             });
         }
 
-        // Agregar un nuevo ingreso
+        // Agregar un nuevo ingreso (CORREGIDO)
         function addIncome() {
             const description = document.getElementById('income-description').value.trim();
             const amount = parseFloat(document.getElementById('income-amount').value);
@@ -619,7 +690,7 @@
                 type: 'income',
                 description,
                 amount,
-                date: new Date().toISOString().split('T')[0]
+                date: getCurrentDate()  // FECHA CORREGIDA
             };
             
             transactions.push(newIncome);
@@ -634,7 +705,7 @@
             alert('Ingreso agregado correctamente');
         }
 
-        // Agregar un nuevo gasto
+        // Agregar un nuevo gasto (CORREGIDO)
         function addExpense() {
             const description = document.getElementById('expense-description').value.trim();
             const amount = parseFloat(document.getElementById('expense-amount').value);
@@ -649,7 +720,7 @@
                 type: 'expense',
                 description,
                 amount,
-                date: new Date().toISOString().split('T')[0]
+                date: getCurrentDate()  // FECHA CORREGIDA
             };
             
             transactions.push(newExpense);
@@ -722,7 +793,7 @@
             if (Object.keys(expenseCategories).length > 0) {
                 analysis += `<p><strong>Distribución de Gastos:</strong></p><ul>`;
                 for (const [category, amount] of Object.entries(expenseCategories)) {
-                    const percentage = ((amount / totalExpenses) * 100).toFixed(1);
+                    const percentage = totalExpenses > 0 ? ((amount / totalExpenses) * 100).toFixed(1) : '0';
                     analysis += `<li>${category}: S/ ${amount.toFixed(2)} (${percentage}%)</li>`;
                 }
                 analysis += `</ul>`;
@@ -774,6 +845,78 @@
             document.body.removeChild(link);
             
             alert('Archivo CSV descargado correctamente');
+        }
+
+        // Funciones de sincronización
+        function exportData() {
+            const dataStr = JSON.stringify(transactions, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'datos_financieros.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            alert('Datos exportados. Guarda este archivo y llévalo contigo.');
+        }
+
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        transactions = importedData;
+                        localStorage.setItem('financialTransactions', JSON.stringify(transactions));
+                        updateDashboard();
+                        renderTransactionHistory();
+                        alert('Datos importados correctamente!');
+                    } catch (error) {
+                        alert('Error al importar datos. Verifica el archivo.');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+
+        function saveToFile() {
+            const htmlContent = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Financiero Personal</title>
+    <style>
+        ${document.querySelector('style').innerHTML}
+    </style>
+</head>
+<body>
+    ${document.querySelector('.container').outerHTML}
+    <script>
+        ${document.querySelector('script').innerHTML}
+    <\/script>
+</body>
+</html>`;
+
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'app_finanzas_completa.html';
+            link.click();
+            
+            alert('Aplicación guardada. Lleva este archivo a cualquier computadora.');
         }
 
         // Inicializar la aplicación cuando se carga la página
